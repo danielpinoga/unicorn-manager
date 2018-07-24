@@ -10,4 +10,11 @@ router.get('/', function (req, res, next) {
     })
 })
 
+router.get('/:id', (req, res) => {
+  Location.findById(req.params.id)
+    .then((data) => {
+      res.json(data)
+    })
+})
+
 module.exports = router
