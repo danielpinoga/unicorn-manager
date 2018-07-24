@@ -5,7 +5,7 @@ var path = require('path')
 var mongoose = require('mongoose')
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true })
 
-var unicornRouter = require('./routes/unicorns')
+var locationRouter = require('./routes/locations')
 
 var app = express()
 
@@ -13,7 +13,7 @@ var app = express()
 app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
 
-app.use('/', unicornRouter)
+app.use('/locations', locationRouter)
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
