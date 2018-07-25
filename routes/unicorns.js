@@ -17,8 +17,30 @@ router.get('/', (req, res) => {
           allUnicorns.push(updatedUnicorn)
         })
       })
-
       res.json(allUnicorns)
+    })
+})
+
+router.get('/:id', (req, res) => {
+  const unicornId = req.params.id
+  let oneUnicorn = {}
+  Location.find({})
+    .then((data) => {
+      data.forEach(location => {
+        location.unicorns.forEach(unicorn => {
+          if (unicorn._id == unicornId) {
+            const updatedUnicorn = {
+              _id: unicorn._id,
+              name: unicorn.name,
+              color: unicorn.color,
+              location: location.name
+            }
+            oneUnicorn = updatedUnicorn
+          }
+
+        })
+      })
+      res.json(oneUnicorn)
     })
 })
 
