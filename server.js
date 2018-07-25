@@ -1,10 +1,10 @@
 require('dotenv').config()
 var createError = require('http-errors')
 var express = require('express')
-var path = require('path')
 var mongoose = require('mongoose')
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true })
 
+var indexRouter = require('./routes/index')
 var locationRouter = require('./routes/locations')
 var unicornRouter = require('./routes/unicorns')
 
@@ -14,6 +14,7 @@ var app = express()
 app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
 
+app.use('/', indexRouter)
 app.use('/locations', locationRouter)
 app.use('/unicorns', unicornRouter)
 
