@@ -48,7 +48,12 @@ router.get('/:id', async (req, res) => {
     (err, location) => {
       if (err) console.error(err)
       else {
-        res.json(location.unicorns.id(unicornId))
+        if (location) {
+          const unicorn = location.unicorns.id(unicornId)
+          sendResponse(res, unicorn, 'unable to find unicorn', !!unicorn)
+        } else {
+          sendResponse(res, null, 'unable to find unicorn', false)
+        }
       }
     }
   )
