@@ -21,6 +21,21 @@ router.get('/', async (req, res) => {
   res.json(allUnicorns)
 })
 
+router.post('/', async (req, res) => {
+  try {
+    const locationId = req.body.locationId
+    const unicorn = req.body.unicorn
+    const addResponse = await addUnicorn(locationId, unicorn)
+    sendResponse(
+      res,
+      addResponse.newUnicorn,
+      'could not add unicorn',
+      addResponse.success)
+  } catch (error) {
+    console.error(error)
+  }
+})
+
 router.get('/:id', async (req, res) => {
   const unicornId = req.params.id
   let oneUnicorn = {}
@@ -74,9 +89,8 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    console.log('request body', req.body)
-
     const deleteResponse = await deleteUnicorn(req.params.id)
+
     sendResponse(
       res,
       { result: 'Successfully deleted unicorn!' },
@@ -96,6 +110,21 @@ sendResponse = (res, data, errorMessage, success = true) => {
   } else {
     res.status(403).send(errorMessage)
   }
+}
+
+addUnicorn = async (locationId, unicorn) => {
+  const location = await Location.findById(locationId)
+
+  const newUnicorn = new Unicorn(unicorn)
+  location.unicorns.push((newUnicorn))
+  await location.save()
+
+  console.log(location)
+  return {
+    newUnicorn,
+    success: true
+  }
+
 }
 
 deleteUnicorn = async (unicornId) => {
