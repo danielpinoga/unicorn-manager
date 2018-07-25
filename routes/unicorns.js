@@ -44,43 +44,39 @@ router.get('/:id', async (req, res) => {
   const unicornId = req.params.id
 
   const query = { 'unicorns._id': new ObjectId(unicornId) }
-  Location.findOne(query,
-    (err, location) => {
-      if (err) console.error(err)
-      else {
-        if (location) {
-          const unicorn = location.unicorns.id(unicornId)
-          sendResponse(res, unicorn, 'unable to find unicorn', !!unicorn)
-        } else {
-          sendResponse(res, null, 'unable to find unicorn', false)
-        }
-      }
-    }
-  )
+  const location = await Location.findOne(query)
+  if (location) {
+    const unicorn = location.unicorns.id(unicornId)
+    sendResponse(res, unicorn, 'unable to find unicorn', !!unicorn)
+  } else {
+    sendResponse(res, null, 'unable to find unicorn', false)
+  }
 })
 
 router.put('/:id', async (req, res) => {
   try {
     const unicornId = req.params.id
     const updatedUnicorn = req.body
-    let unicornFound = false
-    let unicornToReturn = {}
 
-    const locations = await Location.find({})
-    locations.forEach(async (location) => {
+    const query = { 'unicorns._id': new ObjectId(unicornId) }
+    const location = await Location.findOne(query)
+
+    if (location) {
       const unicorn = location.unicorns.id(unicornId)
       if (unicorn) {
         unicorn.name = updatedUnicorn.name || unicorn.name
         unicorn.color = updatedUnicorn.color || unicorn.color
 
-        unicornFound = true
-        unicornToReturn = unicorn
-
         await location.save()
-      }
-    })
+        sendResponse(res, unicorn, null)
 
-    sendResponse(res, unicornToReturn, 'could not find unicorn to update', unicornFound)
+      } else {
+        sendResponse(res, null, 'unable to find unicorn', false)
+      }
+    } else {
+      sendResponse(res, null, 'unable to find unicorn', false)
+    }
+
 
   } catch (error) {
     console.error(error)
@@ -123,7 +119,7 @@ router.put('/:id/changeLocation', async (req, res) => {
           sendResponse(res, null, 'unable to add unicorn to new location', false)
           /// CRITICAL FAILURE, UNICORN HAS BEEN PERMANENTLY DELETED AT THIS POINT
         } else {
-          sendResponse(res, addResponse.newUnicorn, null, true)
+          sendResponse(res, addResponse.newUnicorn, null)
         }
       }
     }
