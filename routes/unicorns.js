@@ -103,25 +103,25 @@ router.delete('/:id', async (req, res) => {
 
 router.put('/:id/changeLocation', async (req, res) => {
   try {
-    const locationId = req.body.locationId
+    const locationId = req.body.newLocationId
 
-    if (!locationId) {
-      sendResponse(res, null, 'no locationId Provided', false)
-    } else {
+    if (locationId) {
       const deleteResponse = await deleteUnicorn(req.params.id)
 
       console.log('delete resposne', deleteResponse, !deleteResponse.success)
-      if (!deleteResponse.success)
-        sendResponse(res, null, 'unable to delete existing unicorn', false)
-      else {
+      if (deleteResponse.success) {
         const addResponse = await addUnicorn(locationId, deleteResponse.deletedUnicorn)
-        if (!addResponse.success) {
-          sendResponse(res, null, 'unable to add unicorn to new location', false)
-          /// CRITICAL FAILURE, UNICORN HAS BEEN PERMANENTLY DELETED AT THIS POINT
-        } else {
+        if (addResponse.success) {
           sendResponse(res, addResponse.newUnicorn, null)
+        } else {
+          /// CRITICAL FAILURE, UNICORN HAS BEEN PERMANENTLY DELETED AT THIS POINT
+          sendResponse(res, null, 'unable to add unicorn to new location', false)
         }
+      } else {
+        sendResponse(res, null, 'unable to delete existing unicorn', false)
       }
+    } else {
+      sendResponse(res, null, 'no locationId Provided', false)
     }
 
   } catch (error) {
