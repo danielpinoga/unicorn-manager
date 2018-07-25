@@ -1,6 +1,10 @@
 var express = require('express')
 var router = express.Router()
+var ObjectId = require('mongoose').Types.ObjectId;
 var { Location, Unicorn } = require('../db/schema')
+
+var mongoose = require('mongoose')
+var db = mongoose.connection
 
 router.get('/', async (req, res) => {
   const allUnicorns = []
@@ -38,24 +42,16 @@ router.post('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   const unicornId = req.params.id
-  let oneUnicorn = {}
 
-  const allLocations = await Location.find({})
-  allLocations.forEach(location => {
-    location.unicorns.forEach(unicorn => {
-      if (unicorn._id == unicornId) {
-        const updatedUnicorn = {
-          _id: unicorn._id,
-          name: unicorn.name,
-          color: unicorn.color,
-          location: location.name
-        }
-        oneUnicorn = updatedUnicorn
+  const query = { 'unicorns._id': new ObjectId(unicornId) }
+  Location.findOne(query,
+    (err, location) => {
+      if (err) console.error(err)
+      else {
+        res.json(location.unicorns.id(unicornId))
       }
-    })
-  })
-
-  res.json(oneUnicorn)
+    }
+  )
 })
 
 router.put('/:id', async (req, res) => {
@@ -95,7 +91,7 @@ router.delete('/:id', async (req, res) => {
       res,
       { result: 'Successfully deleted unicorn!' },
       'Could not find unicorn to delete',
-      deleteResponse.unicornFound
+      deleteResponse.success
     )
 
   } catch (error) {
@@ -104,7 +100,35 @@ router.delete('/:id', async (req, res) => {
   }
 })
 
-sendResponse = (res, data, errorMessage, success = true) => {
+router.put('/:id/changeLocation', async (req, res) => {
+  try {
+    const locationId = req.body.locationId
+
+    if (!locationId) {
+      sendResponse(res, null, 'no locationId Provided', false)
+    } else {
+      const deleteResponse = await deleteUnicorn(req.params.id)
+
+      console.log('delete resposne', deleteResponse, !deleteResponse.success)
+      if (!deleteResponse.success)
+        sendResponse(res, null, 'unable to delete existing unicorn', false)
+      else {
+        const addResponse = await addUnicorn(locationId, deleteResponse.deletedUnicorn)
+        if (!addResponse.success) {
+          sendResponse(res, null, 'unable to add unicorn to new location', false)
+          /// CRITICAL FAILURE, UNICORN HAS BEEN PERMANENTLY DELETED AT THIS POINT
+        } else {
+          sendResponse(res, addResponse.newUnicorn, null, true)
+        }
+      }
+    }
+
+  } catch (error) {
+    console.error(error)
+  }
+})
+
+const sendResponse = (res, data, errorMessage, success = true) => {
   if (success) {
     res.json(data)
   } else {
@@ -112,7 +136,7 @@ sendResponse = (res, data, errorMessage, success = true) => {
   }
 }
 
-addUnicorn = async (locationId, unicorn) => {
+const addUnicorn = async (locationId, unicorn) => {
   const location = await Location.findById(locationId)
 
   const newUnicorn = new Unicorn(unicorn)
@@ -127,24 +151,28 @@ addUnicorn = async (locationId, unicorn) => {
 
 }
 
-deleteUnicorn = async (unicornId) => {
-  let unicornFound = false
+const deleteUnicorn = async (unicornId) => {
+  console.log('deleting unicorn', unicornId)
+  let success = false
   let deletedUnicorn = {}
 
   const locations = await Location.find({})
   locations.forEach(async (location) => {
     const unicorn = location.unicorns.id(unicornId)
     if (unicorn) {
-      unicornFound = true
       deletedUnicorn = unicorn
+      deletedUnicorn.locationId = location._id
 
+      console.log('found unicorn')
       unicorn.remove()
+      success = true
       await location.save()
+      console.log('success true')
     }
   })
 
   return {
-    unicornFound,
+    success,
     deletedUnicorn
   }
 }

@@ -1,10 +1,11 @@
 require('dotenv').config()
 const mongoose = require('mongoose')
+
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true })
+var db = mongoose.connection
 
 const { Unicorn } = require('./schema')
 const { Location } = require('./schema')
-
 
 const purpleUnicorn = new Unicorn({
   name: 'Danny',
@@ -46,7 +47,7 @@ const saveSeeds = async () => {
   } catch (error) {
     console.error(error)
   } finally {
-    mongoose.connection.close()
+    db.close()
   }
 }
 
