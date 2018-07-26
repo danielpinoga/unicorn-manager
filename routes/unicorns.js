@@ -3,40 +3,36 @@ var router = express.Router()
 var ObjectId = require('mongoose').Types.ObjectId;
 var { Location, Unicorn } = require('../db/schema')
 
-var mongoose = require('mongoose')
-var db = mongoose.connection
-
 router.get('/', async (req, res) => {
-  const allUnicorns = []
-  const allLocations = await Location.find({})
+  try {
+    const allUnicorns = []
+    const allLocations = await Location.find({})
 
-  allLocations.forEach(location => {
-    location.unicorns.forEach(unicorn => {
-      const updatedUnicorn = {
-        _id: unicorn._id,
-        name: unicorn.name,
-        color: unicorn.color,
-        location: location.name
-      }
-      allUnicorns.push(updatedUnicorn)
+    allLocations.forEach(location => {
+      location.unicorns.forEach(unicorn => {
+        const updatedUnicorn = addLocationToUnicorn(unicorn, location)
+        allUnicorns.push(updatedUnicorn)
+      })
     })
-  })
 
-  res.json(allUnicorns)
+    sendSuccessResponse(res, allUnicorns)
+  } catch (error) {
+    console.error(error)
+    sendErrorResponse(res, error.message)
+  }
 })
 
 router.post('/', async (req, res) => {
   try {
     const locationId = req.body.locationId
     const unicorn = req.body.unicorn
-    const addResponse = await addUnicorn(locationId, unicorn)
-    sendResponse(
-      res,
-      addResponse.newUnicorn,
-      'could not add unicorn',
-      addResponse.success)
+
+    const addResponse = await addUnicornToDB(locationId, unicorn)
+    sendResponse(res, addResponse.newUnicorn, 'Could not add unicorn', addResponse.success)
+
   } catch (error) {
     console.error(error)
+    sendErrorResponse(req, error.message)
   }
 })
 
@@ -45,11 +41,12 @@ router.get('/:id', async (req, res) => {
 
   const query = { 'unicorns._id': new ObjectId(unicornId) }
   const location = await Location.findOne(query)
+
   if (location) {
     const unicorn = location.unicorns.id(unicornId)
     sendResponse(res, unicorn, 'unable to find unicorn', !!unicorn)
   } else {
-    sendResponse(res, null, 'unable to find unicorn', false)
+    sendErrorResponse(res, 'unable to find unicorn')
   }
 })
 
@@ -68,36 +65,30 @@ router.put('/:id', async (req, res) => {
         unicorn.color = updatedUnicorn.color || unicorn.color
 
         await location.save()
-        sendResponse(res, unicorn, null)
+        sendSuccessResponse(res, unicorn)
 
       } else {
-        sendResponse(res, null, 'unable to find unicorn', false)
+        sendErrorResponse(res, 'unable to find unicorn', 409)
       }
     } else {
-      sendResponse(res, null, 'unable to find unicorn', false)
+      sendErrorResponse(res, 'unable to find location with unicorn', 409)
     }
-
 
   } catch (error) {
     console.error(error)
-    res.status(500).send(error.message)
+    sendErrorResponse(res, error.message)
   }
 })
 
 router.delete('/:id', async (req, res) => {
   try {
     const deleteResponse = await deleteUnicorn(req.params.id)
+    const successObject = { result: 'Successfully deleted unicorn!' }
 
-    sendResponse(
-      res,
-      { result: 'Successfully deleted unicorn!' },
-      'Could not find unicorn to delete',
-      deleteResponse.success
-    )
-
+    sendResponse(res, successObject, 'Could not find unicorn to delete', deleteResponse.success)
   } catch (error) {
     console.error(error)
-    res.status(500).send(error.message)
+    sendErrorResponse(res, error.message)
   }
 })
 
@@ -106,38 +97,53 @@ router.put('/:id/changeLocation', async (req, res) => {
     const locationId = req.body.newLocationId
 
     if (locationId) {
-      const deleteResponse = await deleteUnicorn(req.params.id)
+      const deleteResponse = await deleteUnicornFromDB(req.params.id)
 
-      console.log('delete resposne', deleteResponse, !deleteResponse.success)
       if (deleteResponse.success) {
         const addResponse = await addUnicorn(locationId, deleteResponse.deletedUnicorn)
         if (addResponse.success) {
-          sendResponse(res, addResponse.newUnicorn, null)
+          sendSuccessResponse(res, addResponse.newUnicorn)
         } else {
           /// CRITICAL FAILURE, UNICORN HAS BEEN PERMANENTLY DELETED AT THIS POINT
-          sendResponse(res, null, 'unable to add unicorn to new location', false)
+          sendErrorResponse(res, 'unable to add unicorn to new location', 500)
         }
       } else {
-        sendResponse(res, null, 'unable to delete existing unicorn', false)
+        sendErrorResponse(res, 'unable to delete existing unicorn', 500)
       }
     } else {
-      sendResponse(res, null, 'no locationId Provided', false)
+      sendErrorResponse(res, 'no locationId Provided', 400)
     }
 
   } catch (error) {
     console.error(error)
+    sendErrorResponse(res, error.message)
   }
 })
 
-const sendResponse = (res, data, errorMessage, success = true) => {
-  if (success) {
-    res.json(data)
-  } else {
-    res.status(403).send(errorMessage)
+const addLocationToUnicorn = (unicorn, location) => {
+  return {
+    ...unicorn.toObject(),
+    location: location.name
   }
 }
 
-const addUnicorn = async (locationId, unicorn) => {
+const sendResponse = (res, data, errorMessage, success, errorStatus = 400) => {
+  if (success) {
+    sendSuccessResponse(res, data)
+  } else {
+    sendErrorResponse(res, errorMessage, errorStatus)
+  }
+}
+
+const sendSuccessResponse = (res, data) => {
+  res.json(data)
+}
+
+const sendErrorResponse = (res, errorMessage, errorStatus = 500) => {
+  res.status(errorStatus).send(errorMessage)
+}
+
+const addUnicornToDB = async (locationId, unicorn) => {
   const location = await Location.findById(locationId)
 
   const newUnicorn = new Unicorn(unicorn)
@@ -152,7 +158,7 @@ const addUnicorn = async (locationId, unicorn) => {
 
 }
 
-const deleteUnicorn = async (unicornId) => {
+const deleteUnicornFromDB = async (unicornId) => {
   console.log('deleting unicorn', unicornId)
   let success = false
   let deletedUnicorn = {}
